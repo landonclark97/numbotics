@@ -59,6 +59,7 @@ Ideally, the library would be expanded upon and cleaned up. Expansion included:
 - [ ] Support for dynamics simulation
 - [ ] Path planners
 - [ ] Control algorithms
+
 Right now the code is only in decent shape. Cleaning includes:
 - [ ] Replacing asserts with proper exception handling
 - [ ] Effective and concise comments - not the page long, undescriptive balogne Python is famous for
