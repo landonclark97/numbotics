@@ -2,3 +2,13 @@
 *__pycache__
 */__pycache__
 __pycache
+
+/build
+*build
+*/build
+build
+
+/numerical_robotics.egg-info
+*numerical_robotics.egg-info
+*/numerical_robotics.egg-info
+numerical_robotics.egg-info
