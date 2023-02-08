@@ -40,7 +40,7 @@ This script creates a simple planar 3R robot with equal link lengths and two pos
  t_n      a_n    alp_n    d_n    th_n
 
 ```
-Of course, the table needs to be filled out with scalar values, and joints needs to be set to an actual number as well. The type field corresponds to whether or not the given joint is prismatic (0) or revolute (1). As an aside, the `pos_dof` and `orn_dof` fields represent the number of positioning and orienting degrees of freedom in the task space. The following table lists which task space variables are considered for each value of `pos_dof` and `orn_dof`
+Of course, the table needs to be filled out with scalar values, and joints needs to be set to an actual number as well. The type field corresponds to whether or not the given joint is prismatic (0) or revolute (1). Also, the `pos_dof` and `orn_dof` fields represent the number of positioning and orienting degrees of freedom in the task space. The following table lists which task space variables are considered for each value of `pos_dof` and `orn_dof`
 
 ```
 pos_dof  
