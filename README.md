@@ -66,7 +66,7 @@ Several batch operations are supported at the moment, such as forward kinematics
 
 ## Future Plans
 
-Ideally, the library would be expanded upon and cleaned up. Expansion included:
+Ideally, the library would be expanded upon and cleaned up. Expansion includes:
 - [ ] Support for dynamics simulation
 - [ ] Path planners
 - [ ] Control algorithms
