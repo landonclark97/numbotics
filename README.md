@@ -51,7 +51,6 @@ pos_dof
 orn_dof  
 1: z axis
 3: SO(3)
-
 ```
 
 ## Basics
