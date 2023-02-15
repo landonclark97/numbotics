@@ -2,6 +2,9 @@
 
 Numbotics is a library made to facilitate numerical analysis of robotic arms. The primary design feature of this library is its mathematical consistency. Many robotics software projects make dealing with underlying data tedious and confusing by wrapping every possible thought you might have in a class. The goal here is to use only vectors, matrices, and tensors to represent what you care about (the numbers), and keep the tedious robotics calculations encapsulated - like what classes were meant to do! 
 
+## Installation
+
+To install this package, clone it from this repository, move into the root directory and run `pip install .`
 
 ## Robots
 
