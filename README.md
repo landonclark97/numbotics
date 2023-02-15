@@ -4,7 +4,7 @@ Numbotics is a library made to facilitate numerical analysis of robotic arms. Th
 
 ## Installation
 
-To install this package, clone it from this repository, move into the root directory and run `pip install .`
+To install this package: clone it, move into the root directory, and run `pip install .`
 
 ## Robots
 
