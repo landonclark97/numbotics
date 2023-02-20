@@ -447,7 +447,7 @@ class Robot():
             return ret_mat
 
 
-    def batch_fk_err(self, x_d, b_q, mask=False):
+    def batch_fk_err(self, x_d, b_q, mask=True):
 
         assert (len(b_q.shape) == 2) and (b_q.shape[1] == self.n)
         B = b_q.shape[0]
@@ -501,6 +501,8 @@ class Robot():
 
 
     def batch_jac(self, b_q, mask=True):
+
+        assert (len(b_q.shape) == 2) and (b_q.shape[1] == self.n)
         B = b_q.shape[0]
         jac_mask = [True]*6
         if mask:
@@ -575,6 +577,113 @@ class Robot():
                     J[:,3:6,i] = ret_mat[:,i,0:3,2]
 
             return J[:,jac_mask,:]
+
+
+    def batch_hess(self, b_q):
+
+        assert (len(b_q.shape) == 2) and (b_q.shape[1] == self.n)
+        assert isinstance(b_q, np.ndarray)
+
+        B = b_q.shape[0]
+        J = self.batch_jac(b_q, mask=False)
+        H = np.zeros((B,6,self.n,self.n))
+
+        i = np.repeat(np.arange(self.n),self.n)
+        j = np.tile(np.arange(self.n),self.n)
+
+        H[:,0:3,i,j] = np.swapaxes(np.cross(np.swapaxes(J[:,3:6,np.minimum(i,j)],1,2),np.swapaxes(J[:,0:3,np.maximum(i,j)],1,2)),1,2)
+        H[:,3:6,i,j] = np.swapaxes(np.cross(np.swapaxes(J[:,3:6,j],1,2),np.swapaxes(J[:,3:6,i],1,2)),1,2)
+
+        return H
+
+
+    def batch_d_sigma(self, Js, Hs):
+        assert (Js.shape[1:] == (self.m,self.n)) and (Hs.shape[1:] == (6,self.n,self.n))
+        assert Js.shape[0] == Hs.shape[0]
+        B = Js.shape[0]
+        U, D, V = np.linalg.svd(Js)
+        H = np.hstack((Hs[:,0:self.pos_dof,:,:],Hs[:,6-self.orn_dof:6,:,:])) # don't overwrite inputs
+        grad = np.zeros((B,self.m,self.n))
+        for i in range(self.m):
+            for k in range(self.n):
+                grad[:,i,k] = (np.swapaxes(U,1,2)[:,i,np.newaxis,:]@H[:,:,:,k]@np.swapaxes(V[:,i,np.newaxis,:],1,2))[:,0,0]
+        return grad
+
+
+    def batch_ik(self, x_d, ik_iters=500, dls_lambda=0.1, thresh=1e-8):
+
+        assert (len(x_d.shape) == 3) and (x_d.shape[1] == 4) and (x_d.shape[2] == 4)
+        B = x_d.shape[0]
+
+        dt = 1.0
+
+        if isinstance(x_d, np.ndarray):
+            success = np.zeros((B,),dtype=int)
+            b_dls_lambdas = np.ones((B,1,1))*dls_lambda
+
+            b_q = np.random.uniform(low=-np.pi,high=np.pi,size=(B,self.n))
+            b_I = np.zeros((B,self.m,self.m))
+            b_I[:,[i for i in range(self.m)],[i for i in range(self.m)]] = 1.0
+
+            for i in range(ik_iters):
+                dx = self.batch_fk_err(x_d, b_q)
+
+                J = self.batch_jac(b_q)
+                Jt = np.swapaxes(J,1,2)
+                dq = (Jt@np.linalg.inv((J@Jt)+(b_dls_lambdas*b_I)))@dx
+
+                b_q += (dq.squeeze(2)*dt)
+
+                dx_new = self.batch_fk_err(x_d, b_q)
+
+                new_err = np.linalg.norm(dx_new,axis=1).squeeze(1)
+                err = np.linalg.norm(dx,axis=1).squeeze(1)
+
+                low_i = np.where(new_err < err)
+                high_i = np.where(new_err > err)
+
+                b_dls_lambdas[low_i,0,0] /= 2.0
+                b_dls_lambdas[high_i,0,0] *= 2.0
+
+            success[np.where(new_err < thresh)] = 1
+
+
+        else:
+            assert conf.TORCH_AVAIL and conf.USE_TORCH
+            assert isinstance(x_d, torch.Tensor)
+            device = conf.TORCH_DEV
+            x_d = x_d.float().to(device)
+
+            success = torch.zeros((B,),dtype=int).to(device)
+            b_dls_lambdas = torch.ones((B,1,1)).to(device)*dls_lambda
+
+            b_q = ((torch.rand((B,self.n))-0.5)*2.0*np.pi).to(device)
+            b_I = torch.zeros((B,self.m,self.m)).to(device)
+            b_I[:,[i for i in range(self.m)],[i for i in range(self.m)]] = 1.0
+
+            for i in range(ik_iters):
+                dx = self.batch_fk_err(x_d, b_q)
+
+                J = self.batch_jac(b_q)
+                Jt = torch.transpose(J,1,2)
+                dq = (Jt@torch.linalg.inv((J@Jt)+(b_dls_lambdas*b_I)))@dx
+
+                b_q += (dq.squeeze(2)*dt)
+
+                dx_new = self.batch_fk_err(x_d, b_q)
+
+                new_err = torch.linalg.norm(dx_new,dim=1).squeeze(1)
+                err = torch.linalg.norm(dx,dim=1).squeeze(1)
+
+                low_i = torch.where(new_err < err)[0]
+                high_i = torch.where(new_err > err)[0]
+
+                b_dls_lambdas[low_i,0,0] /= 2.0
+                b_dls_lambdas[high_i,0,0] *= 2.0
+
+            success[torch.where(new_err < thresh)] = 1
+
+        return success, b_q
 
 
     def null(self, J):
