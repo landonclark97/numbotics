@@ -67,6 +67,7 @@ Several batch operations are supported at the moment, such as forward kinematics
 ## Future Plans
 
 Ideally, the library would be expanded upon and cleaned up. Expansion includes:
+- [x] Batch operations for IK and Hessian
 - [ ] Support for dynamics simulation
 - [ ] Path planners
 - [ ] Control algorithms
