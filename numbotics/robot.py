@@ -417,34 +417,34 @@ class Robot():
                     T[:,1,3] *= np.sin(b_q[:,i])
 
                 ret_mat = ret_mat@T
-            return ret_mat
 
         else:
             assert conf.TORCH_AVAIL and conf.USE_TORCH
             assert isinstance(b_q, torch.Tensor)
-            device = conf.TORCH_DEV
-            b_q = b_q.to(device)
-            T = torch.empty((B,4,4)).to(device)
-            ret_mat = torch.empty((B,4,4)).to(device)
-            ret_mat[:,:,:] = torch.tensor(self.base).to(device)
-            for i, l in enumerate(self.links):
-                T[:,:,:] = torch.tensor(l.base_fk).to(device)
-                if l.link_type == 0:
-                    T[:,2,3] = b_q[:,i]
+            with torch.no_grad():
+                device = conf.TORCH_DEV
+                b_q = b_q.to(device)
+                T = torch.empty((B,4,4)).to(device)
+                ret_mat = torch.empty((B,4,4)).to(device)
+                ret_mat[:,:,:] = torch.tensor(self.base).to(device)
+                for i, l in enumerate(self.links):
+                    T[:,:,:] = torch.tensor(l.base_fk).to(device)
+                    if l.link_type == 0:
+                        T[:,2,3] = b_q[:,i]
 
-                elif l.link_type == 1:
-                    T[:,0,0] *= torch.cos(b_q[:,i])
-                    T[:,0,1] *= -torch.sin(b_q[:,i])
-                    T[:,0,2] *= torch.sin(b_q[:,i])
-                    T[:,0,3] *= torch.cos(b_q[:,i])
+                    elif l.link_type == 1:
+                        T[:,0,0] *= torch.cos(b_q[:,i])
+                        T[:,0,1] *= -torch.sin(b_q[:,i])
+                        T[:,0,2] *= torch.sin(b_q[:,i])
+                        T[:,0,3] *= torch.cos(b_q[:,i])
 
-                    T[:,1,0] *= torch.sin(b_q[:,i])
-                    T[:,1,1] *= torch.cos(b_q[:,i])
-                    T[:,1,2] *= -torch.cos(b_q[:,i])
-                    T[:,1,3] *= torch.sin(b_q[:,i])
+                        T[:,1,0] *= torch.sin(b_q[:,i])
+                        T[:,1,1] *= torch.cos(b_q[:,i])
+                        T[:,1,2] *= -torch.cos(b_q[:,i])
+                        T[:,1,3] *= torch.sin(b_q[:,i])
 
-                ret_mat = ret_mat@T
-            return ret_mat
+                    ret_mat = ret_mat@T
+        return ret_mat
 
 
     def batch_fk_err(self, x_d, b_q, mask=True):
@@ -480,22 +480,23 @@ class Robot():
         else:
             assert conf.TORCH_AVAIL and conf.USE_TORCH
             assert isinstance(b_q, torch.Tensor)
-            device = conf.TORCH_DEV
-            x_d = x_d.to(device)
-            if rep:
-                x_d = torch.unsqueeze(x_d,0)
-                x_d = torch.repeat_interleave(x_d, B, dim=0)
-            b_q = b_q.to(device)
-            delta_x = torch.zeros((B,6,1)).to(device)
-            x_a = self.batch_fk(b_q).to(device)
-            delta_x[:,0:3,0] = x_d[:,0:3,3]-x_a[:,0:3,3]
+            with torch.no_grad():
+                device = conf.TORCH_DEV
+                x_d = x_d.to(device)
+                if rep:
+                    x_d = torch.unsqueeze(x_d,0)
+                    x_d = torch.repeat_interleave(x_d, B, dim=0)
+                b_q = b_q.to(device)
+                delta_x = torch.zeros((B,6,1)).to(device)
+                x_a = self.batch_fk(b_q).to(device)
+                delta_x[:,0:3,0] = x_d[:,0:3,3]-x_a[:,0:3,3]
 
-            orn_a = x_a[:,0:3,0:3]
-            orn_d = x_d[:,0:3,0:3]
-            delta_x[:,3:6,0] = 0.5*(
-                torch.cross(orn_a[:,0:3,0],orn_d[:,0:3,0])+
-                torch.cross(orn_a[:,0:3,1],orn_d[:,0:3,1])+
-                torch.cross(orn_a[:,0:3,2],orn_d[:,0:3,2]))
+                orn_a = x_a[:,0:3,0:3]
+                orn_d = x_d[:,0:3,0:3]
+                delta_x[:,3:6,0] = 0.5*(
+                    torch.cross(orn_a[:,0:3,0],orn_d[:,0:3,0])+
+                    torch.cross(orn_a[:,0:3,1],orn_d[:,0:3,1])+
+                    torch.cross(orn_a[:,0:3,2],orn_d[:,0:3,2]))
 
         return delta_x[:,dx_mask]
 
@@ -539,44 +540,43 @@ class Robot():
                     J[:,0:3,i] = np.cross(ret_mat[:,i,0:3,2],(on-ret_mat[:,i,0:3,3]))
                     J[:,3:6,i] = ret_mat[:,i,0:3,2]
 
-            return J[:,jac_mask,:]
-
         else:
             assert conf.TORCH_AVAIL and conf.USE_TORCH
             assert isinstance(b_q, torch.Tensor)
-            device = conf.TORCH_DEV
-            b_q = b_q.to(device)
-            T = torch.empty((B,4,4)).to(device)
-            J = torch.zeros((B,6,self.n)).to(device)
-            ret_mat = torch.empty((B,self.n+1,4,4)).to(device)
-            ret_mat[:,0,:,:] = torch.tensor(self.base).to(device)
-            for i, l in enumerate(self.links):
-                T[:,:,:] = torch.tensor(l.base_fk).to(device)
-                if l.link_type == 0:
-                    T[:,2,3] = b_q[:,i]
+            with torch.no_grad():
+                device = conf.TORCH_DEV
+                b_q = b_q.to(device)
+                T = torch.empty((B,4,4)).to(device)
+                J = torch.zeros((B,6,self.n)).to(device)
+                ret_mat = torch.empty((B,self.n+1,4,4)).to(device)
+                ret_mat[:,0,:,:] = torch.tensor(self.base).to(device)
+                for i, l in enumerate(self.links):
+                    T[:,:,:] = torch.tensor(l.base_fk).to(device)
+                    if l.link_type == 0:
+                        T[:,2,3] = b_q[:,i]
 
-                elif l.link_type == 1:
-                    T[:,0,0] *= torch.cos(b_q[:,i])
-                    T[:,0,1] *= -torch.sin(b_q[:,i])
-                    T[:,0,2] *= torch.sin(b_q[:,i])
-                    T[:,0,3] *= torch.cos(b_q[:,i])
+                    elif l.link_type == 1:
+                        T[:,0,0] *= torch.cos(b_q[:,i])
+                        T[:,0,1] *= -torch.sin(b_q[:,i])
+                        T[:,0,2] *= torch.sin(b_q[:,i])
+                        T[:,0,3] *= torch.cos(b_q[:,i])
 
-                    T[:,1,0] *= torch.sin(b_q[:,i])
-                    T[:,1,1] *= torch.cos(b_q[:,i])
-                    T[:,1,2] *= -torch.cos(b_q[:,i])
-                    T[:,1,3] *= torch.sin(b_q[:,i])
+                        T[:,1,0] *= torch.sin(b_q[:,i])
+                        T[:,1,1] *= torch.cos(b_q[:,i])
+                        T[:,1,2] *= -torch.cos(b_q[:,i])
+                        T[:,1,3] *= torch.sin(b_q[:,i])
 
-                ret_mat[:,i+1,:,:] = ret_mat[:,i,:,:]@T
+                    ret_mat[:,i+1,:,:] = ret_mat[:,i,:,:]@T
 
-            on = ret_mat[:,-1,0:3,3]
-            for i, l in enumerate(self.links):
-                if l.link_type == 0:
-                    J[:,0:3,i] = ret_mat[:,i,0:3,2]
-                if l.link_type == 1:
-                    J[:,0:3,i] = torch.cross(ret_mat[:,i,0:3,2],(on-ret_mat[:,i,0:3,3]))
-                    J[:,3:6,i] = ret_mat[:,i,0:3,2]
+                on = ret_mat[:,-1,0:3,3]
+                for i, l in enumerate(self.links):
+                    if l.link_type == 0:
+                        J[:,0:3,i] = ret_mat[:,i,0:3,2]
+                    if l.link_type == 1:
+                        J[:,0:3,i] = torch.cross(ret_mat[:,i,0:3,2],(on-ret_mat[:,i,0:3,3]))
+                        J[:,3:6,i] = ret_mat[:,i,0:3,2]
 
-            return J[:,jac_mask,:]
+        return J[:,jac_mask,:]
 
 
     def batch_hess(self, b_q):
@@ -647,41 +647,41 @@ class Robot():
 
             success[np.where(new_err < thresh)] = 1
 
-
         else:
             assert conf.TORCH_AVAIL and conf.USE_TORCH
             assert isinstance(x_d, torch.Tensor)
-            device = conf.TORCH_DEV
-            x_d = x_d.float().to(device)
+            with torch.no_grad():
+                device = conf.TORCH_DEV
+                x_d = x_d.float().to(device)
 
-            success = torch.zeros((B,),dtype=int).to(device)
-            b_dls_lambdas = torch.ones((B,1,1)).to(device)*dls_lambda
+                success = torch.zeros((B,),dtype=int).to(device)
+                b_dls_lambdas = torch.ones((B,1,1)).to(device)*dls_lambda
 
-            b_q = ((torch.rand((B,self.n))-0.5)*2.0*np.pi).to(device)
-            b_I = torch.zeros((B,self.m,self.m)).to(device)
-            b_I[:,[i for i in range(self.m)],[i for i in range(self.m)]] = 1.0
+                b_q = ((torch.rand((B,self.n))-0.5)*2.0*np.pi).to(device)
+                b_I = torch.zeros((B,self.m,self.m)).to(device)
+                b_I[:,[i for i in range(self.m)],[i for i in range(self.m)]] = 1.0
 
-            for i in range(ik_iters):
-                dx = self.batch_fk_err(x_d, b_q)
+                for i in range(ik_iters):
+                    dx = self.batch_fk_err(x_d, b_q)
 
-                J = self.batch_jac(b_q)
-                Jt = torch.transpose(J,1,2)
-                dq = (Jt@torch.linalg.inv((J@Jt)+(b_dls_lambdas*b_I)))@dx
+                    J = self.batch_jac(b_q)
+                    Jt = torch.transpose(J,1,2)
+                    dq = (Jt@torch.linalg.inv((J@Jt)+(b_dls_lambdas*b_I)))@dx
 
-                b_q += (dq.squeeze(2)*dt)
+                    b_q += (dq.squeeze(2)*dt)
 
-                dx_new = self.batch_fk_err(x_d, b_q)
+                    dx_new = self.batch_fk_err(x_d, b_q)
 
-                new_err = torch.linalg.norm(dx_new,dim=1).squeeze(1)
-                err = torch.linalg.norm(dx,dim=1).squeeze(1)
+                    new_err = torch.linalg.norm(dx_new,dim=1).squeeze(1)
+                    err = torch.linalg.norm(dx,dim=1).squeeze(1)
 
-                low_i = torch.where(new_err < err)[0]
-                high_i = torch.where(new_err > err)[0]
+                    low_i = torch.where(new_err < err)[0]
+                    high_i = torch.where(new_err > err)[0]
 
-                b_dls_lambdas[low_i,0,0] /= 2.0
-                b_dls_lambdas[high_i,0,0] *= 2.0
+                    b_dls_lambdas[low_i,0,0] /= 2.0
+                    b_dls_lambdas[high_i,0,0] *= 2.0
 
-            success[torch.where(new_err < thresh)] = 1
+                success[torch.where(new_err < thresh)] = 1
 
         return success, b_q
 
