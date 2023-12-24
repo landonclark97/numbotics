@@ -121,3 +121,35 @@ class Eul():
             t += self.dt
 
         return t-init_t, x
+
+
+def line_integral(points, cost_function=lambda x: 1.0, step_size=0.1):
+
+    integral = 0.0
+    num_points = len(points)
+
+    for i in range(num_points - 1):
+
+        start_point = points[i]
+        end_point = points[i + 1]
+
+        vector = end_point - start_point
+        segment_length = np.linalg.norm(vector)
+        unit_vector = vector / segment_length
+
+        position = np.copy(start_point)
+
+        while np.linalg.norm(position - start_point) < segment_length:
+
+            next_position = position + unit_vector*step_size
+            if np.linalg.norm(next_position-start_point) > segment_length:
+                next_position = end_point
+
+            avg_cost = 0.5*(cost_function(position)+cost_function(next_position))
+
+            dist = np.linalg.norm(next_position-position)
+            integral += avg_cost*dist
+
+            position = next_position
+
+    return integral

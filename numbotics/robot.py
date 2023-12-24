@@ -302,6 +302,17 @@ class Robot():
 
 
     @property
+    def min_post_fail_sing(self):
+        rem_list = [j for i in range(self.n) for j in range(self.n) if i != j]
+        J = self.jac
+
+        J_f = np.swapaxes(np.reshape(np.swapaxes(J[:,rem_list], 0, 1), (self.n,self.n-1,self.m)), 1, 2)
+        sings = np.linalg.svd(J_f, compute_uv=False)
+
+        return np.amin(sings)
+
+
+    @property
     def max_manifs(self):
         assert self.m in [2,3,6]
         return {2:2, 3:4, 6:16}[self.m]
@@ -582,17 +593,35 @@ class Robot():
     def batch_hess(self, b_q):
 
         assert (len(b_q.shape) == 2) and (b_q.shape[1] == self.n)
-        assert isinstance(b_q, np.ndarray)
 
-        B = b_q.shape[0]
-        J = self.batch_jac(b_q, mask=False)
-        H = np.zeros((B,6,self.n,self.n))
+        if isinstance(b_q, np.ndarray):
 
-        i = np.repeat(np.arange(self.n),self.n)
-        j = np.tile(np.arange(self.n),self.n)
+            B = b_q.shape[0]
+            J = self.batch_jac(b_q, mask=False)
+            H = np.empty((B,6,self.n,self.n))
 
-        H[:,0:3,i,j] = np.swapaxes(np.cross(np.swapaxes(J[:,3:6,np.minimum(i,j)],1,2),np.swapaxes(J[:,0:3,np.maximum(i,j)],1,2)),1,2)
-        H[:,3:6,i,j] = np.swapaxes(np.cross(np.swapaxes(J[:,3:6,j],1,2),np.swapaxes(J[:,3:6,i],1,2)),1,2)
+            i = np.repeat(np.arange(self.n),self.n)
+            j = np.tile(np.arange(self.n),self.n)
+
+            H[:,0:3,i,j] = np.swapaxes(np.cross(np.swapaxes(J[:,3:6,np.minimum(i,j)],1,2),np.swapaxes(J[:,0:3,np.maximum(i,j)],1,2)),1,2)
+            H[:,3:6,i,j] = np.swapaxes(np.cross(np.swapaxes(J[:,3:6,j],1,2),np.swapaxes(J[:,3:6,i],1,2)),1,2)
+
+        else:
+            assert conf.TORCH_AVAIL and conf.USE_TORCH
+            assert isinstance(b_q, torch.Tensor)
+            with torch.no_grad():
+                device = conf.TORCH_DEV
+                b_q = b_q.to(device)
+
+                B = b_q.shape[0]
+                J = self.batch_jac(b_q, mask=False)
+                H = torch.empty((B,6,self.n,self.n)).to(device)
+
+                i = torch.repeat_interleave(torch.arange(self.n),self.n)
+                j = torch.arange(self.n).tile(self.n)
+
+                H[:,0:3,i,j] = torch.transpose(torch.cross(torch.transpose(J[:,3:6,torch.minimum(i,j)],1,2),torch.transpose(J[:,0:3,torch.maximum(i,j)],1,2)),1,2)
+                H[:,3:6,i,j] = torch.transpose(torch.cross(torch.transpose(J[:,3:6,j],1,2),torch.transpose(J[:,3:6,i],1,2)),1,2)
 
         return H
 
@@ -600,13 +629,36 @@ class Robot():
     def batch_d_sigma(self, Js, Hs):
         assert (Js.shape[1:] == (self.m,self.n)) and (Hs.shape[1:] == (6,self.n,self.n))
         assert Js.shape[0] == Hs.shape[0]
-        B = Js.shape[0]
-        U, D, V = np.linalg.svd(Js)
-        H = np.hstack((Hs[:,0:self.pos_dof,:,:],Hs[:,6-self.orn_dof:6,:,:])) # don't overwrite inputs
-        grad = np.zeros((B,self.m,self.n))
-        for i in range(self.m):
-            for k in range(self.n):
-                grad[:,i,k] = (np.swapaxes(U,1,2)[:,i,np.newaxis,:]@H[:,:,:,k]@np.swapaxes(V[:,i,np.newaxis,:],1,2))[:,0,0]
+        assert isinstance(Js, np.ndarray) == isinstance(Hs, np.ndarray)
+        assert isinstance(Js, torch.Tensor) == isinstance(Hs, torch.Tensor)
+
+        dims = [i for i in range(6) if (i < self.pos_dof or i >= 6-self.orn_dof)]
+
+        if isinstance(Js, np.ndarray):
+            B = Js.shape[0]
+            U, D, V = np.linalg.svd(Js)
+            H = np.hstack((Hs[:,0:self.pos_dof,:,:],Hs[:,6-self.orn_dof:6,:,:])) # don't overwrite inputs
+            grad = np.zeros((B,self.m,self.n))
+            for i in dims:
+                for k in range(self.n):
+                    grad[:,i,k] = (np.swapaxes(U,1,2)[:,i,np.newaxis,:]@H[:,:,:,k]@np.swapaxes(V[:,i,np.newaxis,:],1,2))[:,0,0]
+
+        else:
+            assert conf.TORCH_AVAIL and conf.USE_TORCH
+            assert isinstance(Js, torch.Tensor)
+            with torch.no_grad():
+                device = conf.TORCH_DEV
+                Js = Js.to(device)
+                Hs = Hs.to(device)
+
+                B = Js.shape[0]
+                U, D, V = torch.linalg.svd(Js, driver='gesvda')
+                H = torch.hstack((Hs[:,0:self.pos_dof,:,:],Hs[:,6-self.orn_dof:6,:,:])) # don't overwrite inputs
+                grad = torch.zeros((B,self.m,self.n)).to(device)
+                for i in dims:
+                    for k in range(self.n):
+                        grad[:,i,k] = (torch.transpose(U,1,2)[:,i,np.newaxis,:]@H[:,:,:,k]@torch.transpose(V[:,i,np.newaxis,:],1,2))[:,0,0]
+
         return grad
 
 
@@ -686,6 +738,21 @@ class Robot():
         return success, b_q
 
 
+    def batch_min_post_fail_sing(self, b_q, ignore_j=None):
+        assert (len(b_q.shape) == 2) and (b_q.shape[1] == self.n)
+        assert (ignore_j is None) or isinstance(ignore_j, list)
+        if ignore_j == None:
+            ignore_j = []
+
+        rem_list = [j for i in range(self.n) for j in range(self.n) if i != j]
+
+        Js = self.batch_jac(b_q)
+        Js_f = np.swapaxes(np.reshape(np.swapaxes(Js[:,:,rem_list],1,2), (-1,self.n,self.n-1,self.m)),2,3)
+
+        sings = np.linalg.svd(Js_f,compute_uv=False)[:,[i for i in range(self.n) if i not in ignore_j],:]
+        return np.amin(np.amin(sings,axis=2),axis=1)
+
+
     def null(self, J):
         if self.n > self.m:
             return np.atleast_2d(np.linalg.svd(J)[2][self.m:self.n,:]).T
@@ -715,13 +782,14 @@ class Robot():
         return delta_x[dx_mask]
 
 
-    def ik(self, x_d, ik_iters=500, dls_lambda=0.1, thresh=1e-8, rej_limit=50, disp=False):
+    def ik(self, x_d, ik_iters=500, dls_lambda=0.1, thresh=1e-8, rej_limit=50, rand_init=True, disp=False):
 
         assert x_d.shape == (4,4)
         if disp:
             assert self.use_gfx
 
-        self.q_rand
+        if rand_init:
+            self.q_rand
 
         success = False
         rej_cnt = 0
@@ -770,7 +838,7 @@ class Robot():
             assert self.use_gfx
 
         if np.linalg.norm(self.fk_err(x_d)) > ik_thresh:
-            s_ik = self.ik(x_d)
+            s_ik = self.ik(x_d, rand_init=False)
             if not s_ik:
                 return 0, None
 
@@ -849,7 +917,7 @@ class Robot():
         return success, smm_int
 
 
-    def all_smms(self, x_d, samples=128, step=0.05, sing_thresh=5e-3, smm_iters=1000, without_new=25, max_fails=5, diff_thresh=0.15, plot=False):
+    def all_smms(self, x_d, samples=128, step=0.05, sing_thresh=5e-3, smm_iters=1000, without_new=25, max_fails=5, diff_thresh=0.15, adapt_diff=False, plot=False):
 
         assert x_d.shape == (4,4)
         if plot:
@@ -867,25 +935,27 @@ class Robot():
 
         while current_without < without_new:
 
-            self.q_rand
             s = self.ik(x_d)
 
             if s:
                 fails = 0
+                add_manifold = True
+                for mf in manifold_data:
+                    if adapt_diff:
+                        diff_thresh = 2.0*np.mean(np.linalg.norm(tr_inv(mf[:,:-1]/mf[:,1:]),axis=1))
+                    if np.amin(np.linalg.norm(tr_inv(mf.T/tr(self.q.T)),axis=1)) < diff_thresh:
+                        add_manifold = False
+                        current_without += 1
+                        break
+                if not add_manifold:
+                    continue
+
                 s_smm, angles = self.smm(x_d, samples=samples, smm_iters=smm_iters, step=step, sing_thresh=sing_thresh, squeeze=True, disp=False)
 
                 if s_smm == 1:
                     ang = tr(angles)
-                    add_manifold = True
-                    for mf in manifold_data:
-                        if np.min(np.linalg.norm(tr_inv(mf.T/ang[np.random.randint(0,samples),:]),axis=1)) < diff_thresh:
-                            add_manifold = False
-                            current_without += 1
-                            break
-
-                    if add_manifold:
-                        current_without = 0
-                        manifold_data = np.concatenate((manifold_data, np.swapaxes(ang,0,1)[np.newaxis,...]), axis=0)
+                    current_without = 0
+                    manifold_data = np.concatenate((manifold_data, np.swapaxes(ang,0,1)[np.newaxis,...]), axis=0)
 
                 elif s_smm == 2:
                     manifold_data = np.zeros((max_manifs+1,self.n,samples,0),dtype=np.complex128)

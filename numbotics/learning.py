@@ -1,4 +1,5 @@
 import numbotics.config as conf
+import numbotics.logger as nlog
 
 import torch
 import torch.nn as nn
@@ -8,46 +9,58 @@ import torch.optim as optim
 
 device = conf.TORCH_DEV
 
-
-class SingularNet(nn.Module):
-    def __init__(self, n):
-        super(SingularNet, self).__init__()
-        self.l1 = nn.Linear(n,60).to(device)
-        self.l2 = nn.Linear(60,100).to(device)
-        self.l3 = nn.Linear(100,100).to(device)
-        self.l4 = nn.Linear(100,1).to(device)
-        self.opt = optim.Adam(self.parameters(),lr=0.005)
-
-    def __call__(self, x):
-        self.opt.zero_grad()
-        x_ret = torch.tensor(x,dtype=torch.float32).requires_grad_(True)
-        self.forward(x_ret.to(device)).backward()
-        grad = x_ret.grad
-        self.opt.zero_grad()
-        return grad.detach().numpy().T
-
-    def parameters(self):
-        return [self.l1.weight, self.l1.bias,
-                self.l2.weight, self.l2.bias,
-                self.l3.weight, self.l3.bias,
-                self.l4.weight, self.l4.bias]
+class FeedforwardNet(nn.Module):
+    def __init__(self, layers, act_func=nn.LeakyReLU, opt=optim.AdamW, lr=0.01, loss=None):
+        super().__init__()
+        self.model = nn.Sequential()
+        for l in range(len(layers)-2):
+            self.model.add_module('layer'+str(l), nn.Linear(layers[l],layers[l+1], device=device))
+            self.model.add_module('activ'+str(l), act_func())
+        self.model.add_module('layer'+str(l+1), nn.Linear(layers[-2],layers[-1], device=device))
+        self.opt = opt(self.model.parameters(), lr=lr)
+        if loss is None:
+            self.loss = nn.MSELoss(reduction='mean')
+        else:
+            self.loss = loss
 
     def forward(self, x):
-        out = x.to(device)
-        out = F.leaky_relu(self.l1(out))
-        out = F.leaky_relu(self.l2(out))
-        out = F.leaky_relu(self.l3(out))
-        return self.l4(out)
+        return self.model(x.to(device))
 
-    def update(self, X, Y):
-        Yhat = self.forward(X)
-        loss = torch.mean(torch.mean(torch.pow(Yhat-Y.to(device),2),dim=1),dim=0)
+    def train(self, x, y):
         self.opt.zero_grad()
+        loss = self.loss(y.to(device), self.model(x.to(device)).to(device))
         loss.backward()
         self.opt.step()
         return loss.item()
 
+    def save(self, path, del_opt=False):
+        if del_opt:
+            del self.opt
+        torch.save(self, path)
 
+    @staticmethod
+    def load(path):
+        return torch.load(path, map_location=device)
+
+
+def get_lin_weight(net, layer):
+    assert isinstance(net, FeedforwardNet)
+    try:
+        w = net.model[layer*2].weight.cpu().detach().numpy()
+        return w
+    except Exception as exc:
+        nlog.error('attempting to access non-existant neural network layer')
+        raise IndexError('network does not contain {} layers'.format(layer)) from exc
+
+
+def get_lin_bias(net, layer):
+    assert isinstance(net, FeedforwardNet)
+    try:
+        w = net.model[layer*2].bias.cpu().detach().numpy()
+        return w
+    except Exception as exc:
+        nlog.error('attempting to access non-existant neural network layer')
+        raise IndexError('network does not contain {} layers'.format(layer)) from exc
 
 
 
