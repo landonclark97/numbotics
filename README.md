@@ -4,13 +4,18 @@ Numbotics is a library made to facilitate numerical analysis of robotic arms. Th
 
 ## Installation
 
-To install this package: clone it, move into the root directory, and run `pip install .`
+To install this package, run: 
+```bash
+git clone https://github.com/landonclark97/numbotics
+cd numbotics
+pip install .
+```
 
 ## Robots
 
 The Robot class holds all of the important functions and what not to get started. All robots are defined in this library by their DH parameters. A robot can be created using the following script:
 
-```
+```python
 import numbotics.robot as rob
 
 l1 = rob.Link([1, 1.0, 0.0, 0.0, 0.0])
