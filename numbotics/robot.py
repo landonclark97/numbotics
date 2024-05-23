@@ -399,6 +399,18 @@ class Robot():
         return J
 
 
+    def _min_post_fail_sing(self, ignore_j=None):
+        rem_list = [j for i in range(self.n) for j in range(self.n) if i != j]
+        J = self.jac
+
+        J_f = np.swapaxes(np.reshape(np.swapaxes(J[:,rem_list], 0, 1), (self.n,self.n-1,self.m)), 1, 2)
+        sings = np.linalg.svd(J_f, compute_uv=False)
+
+        if ignore_j is not None:
+            sings[ignore_j] = np.inf
+        return np.amin(sings)
+
+
     def jac_dot(self, qdot):
         assert (qdot.shape == (self.n,1))
         return (self.hess@qdot).squeeze(2)
@@ -662,10 +674,13 @@ class Robot():
         return grad
 
 
-    def batch_ik(self, x_d, ik_iters=500, dls_lambda=0.1, thresh=1e-8):
+    def batch_ik(self, x_d, b_q=None, ik_iters=500, dls_lambda=0.1, thresh=1e-8):
 
         assert (len(x_d.shape) == 3) and (x_d.shape[1] == 4) and (x_d.shape[2] == 4)
         B = x_d.shape[0]
+
+        if b_q is not None:
+            assert (b_q.shape[0] == B) and (b_q.shape[1] == self.n)
 
         dt = 1.0
 
@@ -673,7 +688,8 @@ class Robot():
             success = np.zeros((B,),dtype=int)
             b_dls_lambdas = np.ones((B,1,1))*dls_lambda
 
-            b_q = np.random.uniform(low=-np.pi,high=np.pi,size=(B,self.n))
+            if b_q is None:
+                b_q = np.random.uniform(low=-np.pi,high=np.pi,size=(B,self.n))
             b_I = np.zeros((B,self.m,self.m))
             b_I[:,[i for i in range(self.m)],[i for i in range(self.m)]] = 1.0
 

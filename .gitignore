@@ -12,3 +12,5 @@ build
 *numerical_robotics.egg-info
 */numerical_robotics.egg-info
 numerical_robotics.egg-info
+
+.DS_Store
