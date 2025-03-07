@@ -40,7 +40,7 @@ class FeedforwardNet(nn.Module):
 
     @staticmethod
     def load(path):
-        return torch.load(path, map_location=device)
+        return torch.load(path, map_location=device, weights_only=False)
 
 
 def get_lin_weight(net, layer):

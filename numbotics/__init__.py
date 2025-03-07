@@ -1,5 +1,6 @@
 import numbotics.robot
 #import numbotics.graphics
+import numbotics.polytope
 import numbotics.logger
 import numbotics.solver
 import numbotics.spatial

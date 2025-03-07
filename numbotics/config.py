@@ -10,4 +10,9 @@ MATPLOT_AVAIL = 'matplotlib' in {pkg.key for pkg in pkg_resources.working_set}
 
 if TORCH_AVAIL and USE_TORCH:
     import torch
-    TORCH_DEV = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    if torch.cuda.is_available():
+        TORCH_DEV = torch.device('cuda')
+    elif torch.backends.mps.is_available():
+        TORCH_DEV = torch.device('mps')
+    else:
+        TORCH_DEV = torch.device('cpu')
