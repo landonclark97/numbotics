@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "numerical-robotics"
+name = "numbotics"
 version = "0.0.1"
 description = "A numerical analysis library made to encapsulate common and tedious robotics functions"
 authors = ["Landon Clark <landonclark97@gmail.com>"]
@@ -8,9 +8,27 @@ packages = [{include = "numbotics"}]
 
 [tool.poetry.dependencies]
 python = "~3.11"
-numpy = "^1.26.3"
-scipy = "^1.11.4"
-cvxpy = "^1.4.1"
+scipy = "^1.15.0"
+cvxpy = "^1.6.0"
 mosek = "^10.1.21"
 pybullet = "^3.2.6"
 pyyaml = "^6.0.1"
+qpsolvers = "^4.5.0"
+matplotlib = "^3.10.1"
+torch = "^2.6.0"
+networkx = "^3.4.2"
+trimesh = "^4.6.5"
+vhacdx = "^0.0.8.post2"
+meshcat = {git = "https://github.com/meshcat-dev/meshcat-python.git"}
+hnswlib = "^0.8.0"
+urdf-parser-py = "^0.0.4"
+numba = "^0.61.2"
+numpy = "^2.2.0"
+faiss-cpu = "^1.11.0"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.3.5"
+ruff = "^0.9.10"
+
+[tool.pytest.ini_options]
+testpaths = ["numbotics/tests"]

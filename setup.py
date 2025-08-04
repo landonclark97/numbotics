@@ -2,9 +2,10 @@
 
 from distutils.core import setup
 
-setup(name='numerical-robotics',
-      version='0.0.1',
-      description='Numerical analysis library for robotics using Numpy',
-      author='Landon Clark',
-      packages=['numbotics']
+setup(
+    name="numerical-robotics",
+    version="0.0.1",
+    description="Numerical analysis library for robotics using Numpy",
+    author="Landon Clark",
+    packages=["numbotics"],
 )
